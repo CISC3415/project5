@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
         targ_y = plan[curr_pos+1];
         targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
         angle_away = rtod(targ_a)-rtod(curr_a);
-        if (abs(angle_away) < 5) {
+        if (abs(angle_away) < 2) {
           turnrate = 0;
           speed = 1.0;
           finding_angle = 0;
