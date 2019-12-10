@@ -51,7 +51,13 @@ int main(int argc, char *argv[])
 
   int pLength;
   double *plan;
-
+  int curr_pos = 0;
+  int started = 1, arrived = 0, bumped = 0;
+  int finding_angle = 0, traveling = 0;
+  double curr_x, curr_y, curr_a;
+  double targ_x=0, targ_y=0, targ_a=0;
+  int turn_sign = 1;
+  double angle_away, dist_away, dx, dy;
   // Set up proxies. These are the names we will use to connect to 
   // the interface to the robot.
   PlayerClient    robot("localhost");  
@@ -76,8 +82,6 @@ int main(int argc, char *argv[])
   readPlan(plan, pLength);    // Read the plan from the file plan.txt.
   printPlan(plan,pLength);    // Print the plan on the screen
   writePlan(plan, pLength);   // Write the plan to the file plan-out.txt
-
-
   // Main control loop
   while(true) 
     {    
@@ -86,35 +90,97 @@ int main(int argc, char *argv[])
       // Read new information about position
       pose = readPosition(lp);
       // Print data on the robot to the terminal
-      printRobotData(bp, pose);
+      // printRobotData(bp, pose);
       // Print information about the laser. Check the counter first to stop
       // problems on startup
       if(counter > 2){
-	printLaserData(sp);
+	// printLaserData(sp);
       }
 
       // Print data on the robot to the terminal --- turned off for now.
       // printRobotData(bp, pose);
       
-      // If either bumper is pressed, stop. Otherwise just go forwards
-
-      if(bp[0] || bp[1]){
-	speed= 0;
-	turnrate= 0;
-      } 
-      else {
-	speed=.1;
+      curr_x = pose.px;
+      curr_y = pose.py;
+      curr_a = pose.pa;
+       
+      if (bumped) {
+        if (counter < 15) {
+          speed = -0.5;
+        } else if (counter < 25) {
+          speed = 0.5;
+        } else if (counter < 40) {
+          turnrate = 0.0;
+        } else {
+          counter = 0;
+          bumped = 0;
+          speed = 0;
+          finding_angle = 1;
+          traveling = 0;
+          arrived = 0;
+          turnrate = 0.0;
+        }
+        std::cout << counter << std::endl;
+        counter++;
+      } else if (finding_angle) {
+        targ_x = plan[curr_pos];
+        targ_y = plan[curr_pos+1];
+        targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
+        angle_away = rtod(targ_a)-rtod(curr_a);
+        if (abs(angle_away) < 5) {
+          turnrate = 0;
+          speed = 1.0;
+          finding_angle = 0;
+          traveling = 1;
+        } else {
+          std::cout << "Angle Away: " << angle_away << std::endl; 
+          if (angle_away < 0) turnrate = -0.4;
+          else turnrate = 0.4;
+          speed = 0;
+        }
+      } else if (traveling) {
+        dx = curr_x-targ_x;
+        dy = curr_y-targ_y;
+        dist_away = sqrt(dx*dx+dy*dy);
+        speed = 1.0;
+        turnrate = 0.0;
+        if (dist_away < 0.5) {
+          arrived = 1;
+          speed = 0;
+          traveling = 0;
+        }
+      } else if (arrived) {
+        speed = 0.0;
+        turnrate = 0.0;
+        curr_pos += 2;
+        if (curr_pos == pLength) {
+          pp.SetSpeed(0, 0);
+          break;
+        }
+        finding_angle = 1;
+        arrived = 0;
+      } else if (started) {
+        started = 0;
         turnrate = 0;
-      }     
-
+        speed = 0;
+        finding_angle = 1;
+      }
+      if (bp[0] || bp[1] || pp.GetStall()) {
+        if (bp[0]) turn_sign = -1;
+        if (bp[1]) turn_sign = 1;
+        turnrate = 0.4 * turn_sign;
+        bumped = 1;
+      }
+      std::cout << "Current: " << curr_pos/2 << std::endl;
+      std::cout << "Next X: " << plan[curr_pos] << std::endl;
+      std::cout << "Next Y: " << plan[curr_pos+1] << std::endl;
       // What are we doing?
-      std::cout << "Speed: " << speed << std::endl;      
-      std::cout << "Turn rate: " << turnrate << std::endl << std::endl;
+      // std::cout << "Speed: " << speed << std::endl;      
+      // std::cout << "Turn rate: " << turnrate << std::endl << std::endl;
 
       // Send the commands to the robot
       pp.SetSpeed(speed, turnrate);  
       // Count how many times we do this
-      counter++;
     }
   
 } // end of main()
