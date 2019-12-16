@@ -147,11 +147,16 @@ int main(int argc, char *argv[])
         }
       // Travels until distance is good enough
       } else if (traveling) {
+        targ_x = plan[curr_pos];
+        targ_y = plan[curr_pos+1];
+        targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
+        angle_away = rtod(targ_a)-rtod(curr_a);
         dx = curr_x-targ_x;
         dy = curr_y-targ_y;
         dist_away = sqrt(dx*dx+dy*dy);
         speed = 1.0;
-        turnrate = 0.0;
+        if (angle_away < 0) turnrate = -0.4;
+        else turnrate = 0.4;
         // Stop if distance is close enough
         if (dist_away < 0.1) {
           arrived = 1;
