@@ -36,7 +36,7 @@ int  readPlanLength(void);
 void readPlan(double *, int);
 void printPlan(double *,int);  
 void writePlan(double *, int);
-
+void createPlan(); 
 /**
  * main()
  *
@@ -81,6 +81,7 @@ int main(int argc, char *argv[])
   // doubles give the first location that the robot should move to, and
   // so on. The last pair of doubles give the point at which the robot
   // should stop.
+  createPlan();               // Create custom plan
   pLength = readPlanLength(); // Find out how long the plan is from plan.txt
   plan = new double[pLength]; // Create enough space to store the plan
   readPlan(plan, pLength);    // Read the plan from the file plan.txt.
@@ -109,6 +110,14 @@ int main(int argc, char *argv[])
       curr_y = pose.py;
       curr_a = pose.pa;
       
+      // Target position data
+      targ_x = plan[curr_pos];
+      targ_y = plan[curr_pos+1];
+      targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
+      
+      // Angle required to face the target destination
+      angle_away = rtod(targ_a)-rtod(curr_a);
+
       // Backs up if bumped until safe, and begins scanning for next angle
       if (bumped) {
         if (counter < 15) {
@@ -130,12 +139,6 @@ int main(int argc, char *argv[])
         counter++;
       // Finds angle required to go to the next point in the plan
       } else if (finding_angle) {
-        // Data on the next position
-        targ_x = plan[curr_pos];
-        targ_y = plan[curr_pos+1];
-        targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
-        angle_away = rtod(targ_a)-rtod(curr_a);
-        
         // If the angle is good enough, start traveling
         if (abs(angle_away) < 2) {
           turnrate = 0;
@@ -151,10 +154,6 @@ int main(int argc, char *argv[])
         }
       // Travels until distance is good enough
       } else if (traveling) {
-        targ_x = plan[curr_pos];
-        targ_y = plan[curr_pos+1];
-        targ_a = atan2(targ_y-curr_y, targ_x-curr_x);
-        angle_away = rtod(targ_a)-rtod(curr_a);
         dx = curr_x-targ_x;
         dy = curr_y-targ_y;
         dist_away = sqrt(dx*dx+dy*dy);
@@ -162,7 +161,7 @@ int main(int argc, char *argv[])
         if (angle_away < 0) turnrate = -0.4;
         else turnrate = 0.4;
         // Stop if distance is close enough
-        if (dist_away < 0.1) {
+        if (dist_away < 0.5) {
           arrived = 1;
           speed = 0;
           traveling = 0;
@@ -172,7 +171,9 @@ int main(int argc, char *argv[])
         speed = 0.0;
         turnrate = 0.0;
         curr_pos += 2;
+        // If the robot is at its final location, stop
         if (curr_pos == pLength) {
+          std::cout << "Successfully arrived at location!" << std::endl << std::endl;
           pp.SetSpeed(0, 0);
           break;
         }
@@ -194,6 +195,15 @@ int main(int argc, char *argv[])
       // What are we doing?
       std::cout << "Speed: " << speed << std::endl;      
       std::cout << "Turn rate: " << turnrate << std::endl << std::endl;
+
+      // Location data
+      std::cout << "Heading to location: (" << plan[curr_pos] << ", " << plan[curr_pos+1] << ")" << std::endl;
+      std::cout << "Current X: " << curr_x << std::endl;
+      std::cout << "Current Y: " << curr_y << std::endl;
+      std::cout << "Current A: " << curr_a << std::endl;
+      std::cout << "Target X:  " << targ_x << std::endl;
+      std::cout << "Target Y:  " << targ_y << std::endl;
+      std::cout << "Target A:  " << targ_a << std::endl << std::endl;
 
       // Send the commands to the robot
       pp.SetSpeed(speed, turnrate);  
@@ -379,3 +389,10 @@ void writePlan(double *plan , int length)
   planFile.close();
 
 } // End of writePlan
+
+void createPlan() {
+  std::ofstream ofs;
+  ofs.open("plan.txt");
+  ofs << "12 -2.5 -6 -2.5 1.5 -1.5 2.5 2.5 3.5 3.5 5.5 6.5 6.5";
+  ofs.close();
+}
